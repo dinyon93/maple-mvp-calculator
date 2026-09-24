@@ -1,0 +1,7 @@
+/config.local.json
+/data/
+/node_modules/
+.env
+.env.*
+.vercel/
+.DS_Store

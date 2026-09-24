@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101427">
+  <meta name="description" content="충전 비용과 옥션 시세를 입력해 MVP작 회수액과 손익을 비교합니다.">
+  <title>메이플 MVP작 계산기</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <div class="brand"><span class="brand-mark">M</span><div><strong>MVP 계산기</strong><small>메이플스토리 · 개인 시뮬레이터</small></div></div>
+      <span class="local-tag">입력값은 이 브라우저에 저장</span>
+    </header>
+
+    <nav class="main-tabs" aria-label="화면 선택">
+      <button id="calcTab" class="main-tab active" type="button" aria-selected="true">MVP 효율계산기</button>
+      <button id="trendTab" class="main-tab" type="button" aria-selected="false">시세 trend</button>
+    </nav>
+
+    <main id="calculatorPage" class="layout">
+      <section class="workspace" aria-label="계산 조건">
+        <div class="section-heading"><span class="eyebrow">01 / 충전</span><h1>충전 비용</h1><p>목표 캐시만큼 상품권과 카드 혜택을 조합해 보세요.</p></div>
+        <div class="target-field"><label for="targetCash">목표 충전 캐시</label><div class="suffix-field"><input id="targetCash" type="text" inputmode="numeric" autocomplete="off" data-format="amount" value="1,500,000"><span>캐시</span></div></div>
+
+        <div class="subhead"><h2>5만 원권 상품권</h2><span>구매가와 수량 수정 가능</span></div>
+        <div class="column-labels gift-labels" aria-hidden="true"><span>종류</span><span>1장 구매가</span><span>수량</span></div>
+        <div id="gifts"></div>
+
+        <div class="subhead card-title"><h2>추가 카드 결제 혜택</h2><span>최대 3건</span></div>
+        <div class="column-labels card-labels" aria-hidden="true"><span>결제</span><span>혜택</span></div>
+        <div id="cards"></div>
+        <div class="charge-summary"><div><span>충전 합계</span><strong id="chargeTotal">—</strong></div><div><span>실제 지출</span><strong id="actualSpend">—</strong></div><p id="targetStatus" role="status"></p></div>
+
+        <div class="section-heading separated"><span class="eyebrow">02 / 시세</span><h2>메소 시세</h2><p>디스코드 시세와 메소마켓 시세를 직접 입력하세요.</p></div>
+        <div class="market-grid">
+          <label class="stacked">디스코드 시세 <small>1억 메소당 원</small><div class="suffix-field"><input id="discordRate" type="text" inputmode="numeric" autocomplete="off" data-format="amount" placeholder="예: 2,150"><span>원</span></div></label>
+          <label class="stacked">메소마켓 시세 <small>1억 메소당 메이플포인트</small><div class="suffix-field"><input id="marketRate" type="text" inputmode="numeric" autocomplete="off" data-format="amount" placeholder="직접 입력"><span>포인트</span></div></label>
+        </div>
+        <div class="event-box"><h3>메이플포인트 이벤트 <span>선택 입력</span></h3><p>이벤트가 없으면 충전 캐시 1당 1메이플포인트로 계산합니다.</p><div class="event-fields"><label class="stacked">지급 포인트<div class="suffix-field"><input id="eventPoints" type="text" inputmode="numeric" autocomplete="off" data-format="amount" placeholder="예: 10,000"><span>포인트</span></div></label><label class="stacked">구매가<div class="suffix-field"><input id="eventCost" type="text" inputmode="numeric" autocomplete="off" data-format="amount" placeholder="예: 9,000"><span>캐시</span></div></label><label class="stacked">구매 횟수<div class="suffix-field"><input id="eventCount" type="number" min="0" step="1" inputmode="numeric" value="1"><span>회</span></div></label></div><p class="fine-print">구매가는 위에서 충전한 캐시에서 차감합니다. 예: 9,000캐시로 10,000포인트를 1회 구매하면 메소마켓 경로의 총 포인트가 1,000포인트 늘어납니다.</p></div>
+
+        <div class="section-heading separated"><span class="eyebrow">03 / 판매</span><h2>캐시 구매 아이템</h2><p>넥슨캐시로 직접 구매해 옥션에 파는 아이템입니다. 캐시 가격과 옥션 개당 가격을 입력하세요.</p></div>
+        <div class="fee-row"><label for="auctionFee">옥션 판매 수수료</label><div class="suffix-field compact"><input id="auctionFee" type="number" min="0" max="100" step="0.1" inputmode="decimal" value="3"><span>%</span></div></div>
+        <div id="items" class="items"></div>
+        <button id="addItem" class="secondary-button" type="button">＋ 아이템 추가</button>
+        <p class="fine-print">기본 아이템의 캐시 가격은 판매 시기와 묶음 구성에 따라 확인 후 입력하세요. 옥션 묶음 매물은 ‘개당’ 가격을 적습니다.</p>
+        <div class="section-heading separated"><span class="eyebrow">04 / 크레딧</span><h2>메이플크레딧</h2><p>기존 보유 잔액과 캐시 아이템·메이플포인트 구매로 적립된 크레딧을 합산합니다.</p></div>
+        <label class="stacked credit-balance">기존 보유 메이플크레딧<div class="suffix-field"><input id="existingCredits" type="text" inputmode="numeric" autocomplete="off" data-format="amount" value="0"><span>크레딧</span></div></label>
+        <div id="creditItems" class="items"></div>
+        <p class="fine-print">프라임 큐브 10,000 / 프라임 에디셔널 큐브 20,000 크레딧. 옥션 가격은 개당 입력하세요. 포인트 구매 경로는 사용한 캐시가 크레딧 적립 대상 상품의 결제액이라고 가정해 5%를 적립합니다. 상품별 적립 대상 여부와 구매 확정 시점을 확인해 주세요. 선물이나 메이플포인트로 구매한 상품에는 적립하지 않습니다.</p>
+        <div class="refresh-box"><h3>옥션 시세 갱신</h3><p>아이디·비밀번호·캐릭터명·로그인 버튼 CSS 선택자는 사이트가 아닌 <code>config.local.json</code>에 작성합니다. 같은 폴더의 예시 파일을 복사해 본인 PC에서만 수정하세요.</p><button id="refreshPrices" class="primary-button" type="button">옥션 시세 갱신 <span aria-hidden="true">↻</span></button><p id="refreshStatus" class="fine-print" role="status" aria-live="polite">로컬 프로그램에서만 조회할 수 있습니다. 추가 인증은 열린 브라우저에서 직접 완료해 주세요.</p></div>
+        <div class="market-grid credit-import"><label class="stacked">옥션 시세 파일 가져오기 <small>JSON 형식 · 직접 선택</small><input id="priceFile" type="file" accept="application/json,.json"></label><div><a id="priceTemplate" class="secondary-button" href="./auction-prices.example.json" download>시세 파일 예시</a><p class="fine-print">조회가 안 될 때 시세 파일로 여섯 품목을 한 번에 입력할 수 있습니다.</p></div></div>
+      </section>
+
+      <aside class="results" aria-label="계산 결과">
+        <div class="results-head"><span class="eyebrow">결과 / 추천 방법</span><h2>손실이 적은 순서</h2><p>같은 충전액을 각 방법에 썼을 때를 비교합니다.</p></div>
+        <div class="highlight"><span>가장 유리한 방법</span><strong id="bestName">시세를 입력해 주세요</strong><div id="bestLoss" class="big-number">—</div><small id="bestSub">시세를 입력하고 계산하기를 누르세요.</small></div>
+        <button id="calculate" class="primary-button" type="button">계산하기 <span aria-hidden="true">↗</span></button>
+        <p id="feedback" class="feedback" role="status" aria-live="polite"></p>
+        <div id="rankings" class="rankings"></div>
+        <div id="creditSummary" class="credit-summary"></div>
+        <div class="result-note">‘디스코드 판매 메소 합계’에는 기존 크레딧으로 산 큐브도 포함됩니다. 손익과 순위는 기존 보유 크레딧으로 살 수 있던 큐브의 가치를 뺀 이번 충전 증가분만 반영합니다. 큐브 두 종류는 각각 별도 대안으로 비교합니다. 판매 성사, 시세 변동, 기타 거래 비용, 잔여 캐시와 크레딧의 가치는 반영하지 않습니다.</div>
+      </aside>
+    </main>
+    <main id="trendPage" class="trend-page" hidden>
+      <div class="section-heading"><span class="eyebrow">날짜별 시세</span><h1>시세 trend</h1><p>하루에 여러 번 갱신하면 해당 날짜의 마지막 가격으로 기록합니다. 빈 가격은 기존 값을 유지합니다.</p></div>
+      <div class="trend-actions"><label class="stacked">그래프 항목<select id="trendSeries"></select></label><span id="trendStorageNote" class="fine-print"></span></div>
+      <div class="chart-panel"><div id="trendChart" role="img" aria-label="날짜별 시세 추이"></div></div>
+      <h2 class="trend-table-title">날짜별 기록</h2><div class="trend-table-wrap"><table class="trend-table"><thead><tr><th>날짜</th><th>항목</th><th>가격</th></tr></thead><tbody id="trendTable"></tbody></table></div>
+    </main>
+    <footer>MapleStory 및 관련 명칭의 권리는 각 권리자에게 있습니다. 이 계산기는 비공식 개인 도구입니다.</footer>
+  </div>
+  <script src="./calc.js"></script>
+  <script src="./app.js"></script>
+  <script src="./trend.js"></script>
+</body>
+</html>
