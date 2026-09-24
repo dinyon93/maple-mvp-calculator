@@ -7,10 +7,10 @@
     { name: '컬쳐랜드', cost: 47500, count: 2 }
   ];
   const itemDefaults = [
-    { id: 'wonderberry', name: '위습의 원더베리' },
-    { id: 'royalstyle', name: '메이플 로얄 스타일' },
-    { id: 'platinumscissors', name: '플래티넘 카르마의 가위' },
-    { id: 'abysscirculator', name: '심연의 서큘레이터' }
+    { id: 'wonderberry', name: '위습의 원더베리', cashPrice: 54000 },
+    { id: 'royalstyle', name: '메이플 로얄 스타일', cashPrice: 2200 },
+    { id: 'platinumscissors', name: '플래티넘 카르마의 가위', cashPrice: 5900 },
+    { id: 'abysscirculator', name: '심연의 서큘레이터', cashPrice: 4900 }
   ];
   const cubeDefaults = [
     { id: 'primecube', name: '프라임 큐브', creditPrice: 10000, auctionPrice: '', updatedAt: '' },
@@ -19,7 +19,7 @@
   const defaults = {
     target: 1500000, gifts: giftTypes, cards: [{ amount: 300000, benefit: 0 }, { amount: 300000, benefit: 0 }, { amount: 300000, benefit: 0 }],
     discordRate: '', marketRate: '', event: { points: '', cost: '', count: 1 }, fee: 3,
-    existingCredits: 0, creditItems: cubeDefaults, itemDefaultsReady: true, items: itemDefaults.map(x => ({ ...x, cashPrice: '', auctionPrice: '', units: 1, updatedAt: '' }))
+    existingCredits: 0, creditItems: cubeDefaults, itemDefaultsReady: true, items: itemDefaults.map(x => ({ ...x, auctionPrice: '', units: x.id === 'wonderberry' ? 11 : 1, updatedAt: '' }))
   };
   const $ = id => document.getElementById(id);
   const escapeHtml = value => String(value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
