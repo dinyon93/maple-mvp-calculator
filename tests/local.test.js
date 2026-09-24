@@ -5,6 +5,7 @@ const os = require('node:os'), fs = require('node:fs'), path = require('node:pat
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'mvp-calc-'));
 process.env.MVP_DATA_PATH = path.join(temp, 'trends.json');
 const { createServer, readLocalLogin, localDate } = require('../server');
+const { buildSnapshot } = require('../publish');
 const { parseMeso, pricesFromText, loginForm, validateConfiguredSelectors, chooseCharacter, clickCharacterCard } = require('../auction');
 require('../calc');
 const BASE = 'http://127.0.0.1:8765';
@@ -108,10 +109,11 @@ test('메소마켓에 적립된 크레딧과 두 큐브 판매액을 각각 비�
 test('로컬 기록은 같은 날짜에 덮어쓰고 다른 시세는 유지한다', async t => {
   const configPath = path.join(temp, 'config.local.json');
   let received;
+  const published = [];
   const server = createServer(async input => {
     received = input;
     return { items: [{ id: 'royalstyle', auctionPrice: 99888889 }], updatedAt: 'test', errors: [] };
-  }, () => readLocalLogin(configPath));
+  }, () => readLocalLogin(configPath), rows => { published.push(buildSnapshot(rows)); return { published: true }; });
   await new Promise(resolve => server.listen(8765, '127.0.0.1', resolve));
   t.after(async () => { await new Promise(resolve => server.close(resolve)); fs.rmSync(temp, { recursive: true, force: true }); });
   let response = await post('/api/trends', { values: { discordRate: 2200, marketRate: 5000 } });
@@ -130,6 +132,14 @@ test('로컬 기록은 같은 날짜에 덮어쓰고 다른 시세는 유지한�
   response = await post('/api/refresh', { id: 'web-id', password: 'web-secret', character: 'web-character', loginEntrySelector: '#web-login' });
   assert.equal(response.status, 200); const refreshed = await response.json();
   assert.equal(refreshed.items[0].auctionPrice, 99888889);
+  assert.equal(refreshed.publication.published, true);
+  assert.deepEqual(published[0].history[0].values, { discordRate: 2300, marketRate: 5000, royalstyle: 99888889 });
+  assert.equal(JSON.stringify(published).includes('local-secret'), false);
+  response = await post('/api/publish', { values: { discordRate: 2450 } });
+  assert.equal(response.status, 200);
+  assert.equal(published[1].history[0].values.discordRate, 2450);
+  response = await post('/api/publish', { values: { password: 'web-secret' } });
+  assert.equal(response.status, 400);
   assert.equal(received.id, 'local-id');
   assert.equal(received.password, 'local-secret');
   assert.equal(received.character, 'my-character');
@@ -147,4 +157,11 @@ test('로컬 기록은 같은 날짜에 덮어쓰고 다른 시세는 유지한�
   assert.equal(fs.readFileSync(process.env.MVP_DATA_PATH, 'utf8').includes('local-secret'), false);
   response = await fetch(BASE + '/config.local.json'); assert.equal(response.status, 404);
   response = await fetch(BASE + '/trend.js'); assert.equal(response.status, 200);
+});
+test('게시 파일에는 여덟 개 시세와 날짜만 들어간다', () => {
+  const content = buildSnapshot([{ date: '2026-09-24', password: 'do-not-publish', values: {
+    royalstyle: 99888889, discordRate: 2450, privateCharacter: 'character', primecube: -10, loginId: 30
+  } }, { date: '../config.local.json', values: { marketRate: 10000 } }]);
+  assert.deepEqual(content, { updatedAt: '2026-09-24', history: [{ date: '2026-09-24', values: { royalstyle: 99888889, discordRate: 2450 } }] });
+  assert.equal(JSON.stringify(content).includes('do-not-publish'), false);
 });

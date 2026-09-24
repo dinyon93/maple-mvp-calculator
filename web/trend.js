@@ -18,7 +18,24 @@
   function localRead() { try { const value = JSON.parse(localStorage.getItem(KEY)); return Array.isArray(value) ? value : []; } catch (_) { return []; } }
   async function load() {
     history = localRead();
-    $('trendStorageNote').textContent = '이 브라우저에 날짜별로 저장됩니다. 다른 기기와 자동으로 공유되지 않습니다.';
+    $('trendStorageNote').textContent = '직접 입력한 값은 이 브라우저에 저장됩니다.';
+    if (location.protocol !== 'file:') {
+      try {
+        const response = await fetch('./shared-prices.json', { cache: 'no-store' });
+        if (!response.ok) throw Error('공개 기록을 읽지 못했습니다.');
+        const data = await response.json();
+        if (!Array.isArray(data.history)) throw Error('공개 기록 형식이 올바르지 않습니다.');
+        const merged = new Map(history.map(row => [row.date, { date: row.date, values: { ...row.values } }]));
+        for (const row of data.history) {
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(row?.date || '') || !row.values || typeof row.values !== 'object') continue;
+          const current = merged.get(row.date) || { date: row.date, values: {} };
+          for (const [id] of series) if (Number.isSafeInteger(row.values[id]) && row.values[id] > 0) current.values[id] = row.values[id];
+          merged.set(row.date, current);
+        }
+        history = [...merged.values()].sort((a, b) => a.date.localeCompare(b.date));
+        $('trendStorageNote').textContent = 'GitHub에 게시된 날짜별 시세입니다. 이 브라우저에서 직접 입력한 값도 함께 표시됩니다.';
+      } catch (error) { $('trendStorageNote').textContent = `공개 기록 불러오기 실패: ${error.message}`; }
+    }
     render();
   }
   async function record(values) {

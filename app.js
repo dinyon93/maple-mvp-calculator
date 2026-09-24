@@ -166,16 +166,30 @@
       $('refreshPrices').disabled = true;
       $('refreshStatus').textContent = '로컬 설정으로 넥슨 로그인과 옥션 조회를 시도하고 있습니다. 추가 인증이 필요하면 열린 브라우저에서 직접 완료하세요.';
       try {
-        const response = await fetch('/api/refresh', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+        const rates = Object.fromEntries(['marketRate', 'discordRate'].filter(id => Number(model[id]) > 0).map(id => [id, Number(model[id])]));
+        const response = await fetch('/api/refresh', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ values: rates }) });
         const result = await response.json();
         if (!response.ok) throw new Error(result.error || '옥션 조회에 실패했습니다.');
         const count = applyPrices(result, '옥션 조회');
-        $('refreshStatus').textContent = `${count}개 시세를 반영했습니다. ${result.errors?.length ? `조회 실패: ${result.errors.join(' / ')}` : ''}`;
+        $('refreshStatus').textContent = `${count}개 시세를 반영했습니다. ${result.publication?.published ? 'GitHub에 게시했습니다. Vercel 배포가 끝나면 친구들에게도 보입니다.' : `온라인 게시 실패: ${result.publication?.error || '게시 결과를 확인해 주세요.'}`} ${result.errors?.length ? `조회 실패: ${result.errors.join(' / ')}` : ''}`;
       } catch (error) { $('refreshStatus').textContent = `시세 갱신 실패: ${error.message}`; }
       finally { $('refreshPrices').disabled = false; }
     });
+    $('publishPrices').addEventListener('click', async () => {
+      const button = $('publishPrices'); button.disabled = true;
+      $('refreshStatus').textContent = '입력한 시세를 GitHub에 게시하고 있습니다.';
+      try {
+        const publicIds = new Set(['wonderberry', 'royalstyle', 'platinumscissors', 'abysscirculator', 'primecube', 'primeadditionalcube', 'marketRate', 'discordRate']);
+        const values = Object.fromEntries(Object.entries(trendPrices()).filter(([id, value]) => publicIds.has(id) && Number(value) > 0).map(([id, value]) => [id, Number(value)]));
+        const response = await fetch('/api/publish', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ values }) });
+        const result = await response.json();
+        if (!response.ok) throw Error(result.error || '게시 실패');
+        $('refreshStatus').textContent = result.unchanged ? '공개 시세가 이미 최신입니다.' : 'GitHub 게시 완료. Vercel 배포가 끝나면 친구들에게도 보입니다.';
+      } catch (error) { $('refreshStatus').textContent = `온라인 게시 실패: ${error.message}`; }
+      finally { button.disabled = false; }
+    });
     $('calculate').addEventListener('click', compute);
-    if (location.protocol === 'file:') { $('refreshPrices').disabled = true; $('refreshStatus').textContent = '자동조회는 start-windows.bat으로 로컬 프로그램을 실행한 뒤 이용할 수 있습니다.'; }
+    if (location.protocol === 'file:') { $('refreshPrices').disabled = true; $('publishPrices').disabled = true; $('refreshStatus').textContent = '자동조회와 온라인 게시는 start-windows.bat으로 실행한 뒤 이용할 수 있습니다.'; }
   }
   init();
 })();

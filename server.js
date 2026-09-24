@@ -3,6 +3,7 @@ const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
 const { refreshAuctionPrices } = require('./auction');
+const { publish } = require('./publish');
 const PORT = 8765, ROOT = __dirname, DATA = process.env.MVP_DATA_PATH || path.join(ROOT, 'data', 'trends.json');
 const LOGIN_CONFIG = path.join(ROOT, 'config.local.json');
 const SELECTOR_KEYS = ['loginEntrySelector', 'loginMethodSelector', 'loginIdSelector', 'loginPasswordSelector',
@@ -63,7 +64,7 @@ function readLocalLogin(filename = LOGIN_CONFIG) {
     throw Error('CSS 선택자에는 HTML 전체를 넣지 마세요. Elements에서 Copy → Copy selector를 선택해 복사한 값을 입력해 주세요.');
   return { id, password, character, auctionAccount, ...selectors, characterSelectionStage };
 }
-function createServer(refresh = refreshAuctionPrices, loginConfig = readLocalLogin) {
+function createServer(refresh = refreshAuctionPrices, loginConfig = readLocalLogin, publisher = publish) {
   let refreshing = false;
   return http.createServer(async (req, res) => {
     const origin = `http://127.0.0.1:${PORT}`;
@@ -71,17 +72,31 @@ function createServer(refresh = refreshAuctionPrices, loginConfig = readLocalLog
     const pathname = new URL(req.url, origin).pathname;
     if (req.method === 'GET' && pathname === '/api/health') return send(res, 200, { local: true });
     if (req.method === 'GET' && pathname === '/api/trends') return send(res, 200, readHistory());
-    if (req.method === 'POST' && (pathname === '/api/trends' || pathname === '/api/refresh')) {
+    if (req.method === 'POST' && (pathname === '/api/trends' || pathname === '/api/refresh' || pathname === '/api/publish')) {
       if (req.headers.origin !== origin) return send(res, 403, { error: '로컬 페이지에서만 요청할 수 있습니다.' });
       try {
         const body = await jsonBody(req);
         if (pathname === '/api/trends') return send(res, 200, saveHistory(body.values));
+        if (pathname === '/api/publish') {
+          if (body.values && Object.keys(body.values).length) saveHistory(body.values);
+          return send(res, 200, publisher(readHistory()));
+        }
         if (refreshing) return send(res, 409, { error: '옥션 시세를 이미 조회하고 있습니다.' });
         refreshing = true;
         try {
           // Credentials are read on this PC for each request. Browser-supplied
           // fields are intentionally ignored; the settings page never sees them.
           const result = await refresh(loginConfig());
+          const values = {};
+          for (const item of result.items || []) {
+            if (SERIES.has(item.id) && Number.isSafeInteger(item.auctionPrice) && item.auctionPrice > 0) values[item.id] = item.auctionPrice;
+          }
+          for (const id of ['marketRate', 'discordRate']) {
+            if (body.values?.[id] !== '' && body.values?.[id] != null) values[id] = body.values[id];
+          }
+          if (Object.keys(values).length) saveHistory(values);
+          try { result.publication = publisher(readHistory()); }
+          catch (error) { result.publication = { published: false, error: error.message }; }
           return send(res, 200, result);
         } finally { refreshing = false; }
       } catch (error) { return send(res, 400, { error: error.message }); }

@@ -50,7 +50,7 @@
         <label class="stacked credit-balance">기존 보유 메이플크레딧<div class="suffix-field"><input id="existingCredits" type="text" inputmode="numeric" autocomplete="off" data-format="amount" value="0"><span>크레딧</span></div></label>
         <div id="creditItems" class="items"></div>
         <p class="fine-print">프라임 큐브 10,000 / 프라임 에디셔널 큐브 20,000 크레딧. 옥션 가격은 개당 입력하세요. 포인트 구매 경로는 사용한 캐시가 크레딧 적립 대상 상품의 결제액이라고 가정해 5%를 적립합니다. 상품별 적립 대상 여부와 구매 확정 시점을 확인해 주세요. 선물이나 메이플포인트로 구매한 상품에는 적립하지 않습니다.</p>
-        <div class="refresh-box"><h3>옥션 시세 갱신</h3><p>자동 조회는 내 PC에서 <code>start-windows.bat</code>을 실행했을 때만 이용할 수 있습니다. 이 공개 웹페이지에는 계정 정보를 입력하지 마세요. 옥션 가격은 직접 적거나 아래에서 JSON 파일을 가져오세요.</p><button id="refreshPrices" class="primary-button" type="button" disabled>로컬 프로그램 전용 <span aria-hidden="true">↻</span></button><p id="refreshStatus" class="fine-print" role="status" aria-live="polite">공개 웹페이지에서는 로그인·옥션 자동 조회를 제공하지 않습니다.</p></div>
+        <div class="refresh-box"><h3>공개 옥션 시세</h3><p>주인이 로컬 PC에서 갱신한 여섯 품목의 가격과 직접 게시한 메소 시세가 표시됩니다. 이 공개 웹페이지에는 계정 정보를 입력하지 마세요.</p><button id="refreshPrices" class="primary-button" type="button" disabled>자동 조회는 로컬 PC 전용 <span aria-hidden="true">↻</span></button><p id="refreshStatus" class="fine-print" role="status" aria-live="polite">공개 시세를 불러오고 있습니다.</p></div>
         <div class="market-grid credit-import"><label class="stacked">옥션 시세 파일 가져오기 <small>JSON 형식 · 직접 선택</small><input id="priceFile" type="file" accept="application/json,.json"></label><div><a id="priceTemplate" class="secondary-button" href="./auction-prices.example.json" download>시세 파일 예시</a><p class="fine-print">조회가 안 될 때 시세 파일로 여섯 품목을 한 번에 입력할 수 있습니다.</p></div></div>
       </section>
 

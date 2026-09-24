@@ -21,7 +21,24 @@ git push -u origin main
 
 Vercel에서 GitHub 계정을 연결하고 방금 만든 저장소를 **Import**하세요. 프로젝트의 **Root Directory**는 `web`, **Framework Preset**은 `Other`, **Build Command**는 빈 값(Override 활성화), **Output Directory**는 기본값 `.`로 설정하고 **Deploy**를 누르세요. 이 구조에서 GitHub 저장소 최상위가 `maple-mvp` 폴더입니다. 상위 폴더까지 저장소로 만들었다면 Root Directory는 `maple-mvp/web`입니다.
 
-`web/`은 공개용 계산기 화면입니다. 이 화면에서 수동 입력, 시세 파일 가져오기, 계산, 날짜별 그래프를 사용할 수 있습니다. 날짜별 기록은 접속한 브라우저에만 저장되어 다른 친구의 기록과 자동으로 합쳐지지 않습니다. **자동 로그인과 옥션 시세 갱신**은 `start-windows.bat`으로 실행하는 로컬 프로그램에서만 동작합니다. `config.local.json`을 Vercel 환경 변수나 GitHub에 올리지 마세요.
+`web/`은 공개용 계산기 화면입니다. `web/shared-prices.json`에 게시된 시세를 자동으로 읽고, 날짜별 그래프를 친구들과 공유합니다. 공개 사이트에서 직접 고친 값은 본인 브라우저에만 저장되고 친구들에게 공개되지 않습니다. **자동 로그인과 옥션 시세 갱신**은 `start-windows.bat`으로 실행하는 로컬 프로그램에서만 동작합니다. `config.local.json`을 Vercel 환경 변수나 GitHub에 올리지 마세요.
+
+### 로컬 갱신 결과를 친구들에게 공개하기
+
+이미 GitHub와 Vercel을 연결한 경우, 새 버전의 파일을 기존 VS Code 프로젝트 폴더에 **덮어쓴 뒤** `config.local.json`과 `data/`는 그대로 두세요. 압축을 풀어 만든 새 폴더에서 시작하면 GitHub 연결(`.git`)이 없어 게시할 수 없습니다. VS Code에서 기존 폴더를 연 뒤 다음 명령을 실행해 새 기능을 먼저 GitHub와 Vercel에 배포하세요.
+
+```powershell
+git check-ignore -v config.local.json
+git ls-files config.local.json data
+git add README.md app.js index.html package.json publish.js server.js tests/local.test.js web/app.js web/index.html web/trend.js web/shared-prices.json
+git status --short
+git commit -m "Share public price history"
+git push origin main
+```
+
+`git ls-files config.local.json data`는 아무것도 출력하지 않아야 합니다. 이 폴더를 Vercel 프로젝트의 Root Directory `web`으로 배포했는지도 확인하세요. 이후 PC에서 `start-windows.bat` 실행 → **옥션 시세 갱신**을 누르면 여섯 품목의 조회 성공 가격과 입력한 메소마켓·디스코드 시세를 로컬 기록에 남긴 뒤 **오직 `web/shared-prices.json`만** Git으로 커밋하고 푸시합니다. Vercel 자동 배포가 끝나면 친구들이 페이지를 새로고침하여 새 시세와 날짜별 그래프를 볼 수 있습니다. 메소 시세만 바꿨거나 옥션가를 직접 고친 날에는 **현재 입력한 시세 온라인에 게시**를 누르세요. `시세 갱신`이 성공해도 `온라인 게시 실패`가 표시되면 PC 기록만 저장된 상태입니다. 메시지에 따라 Git 로그인을 확인하고 게시 버튼을 다시 누르면 됩니다. PC는 게시 후 꺼도 됩니다.
+
+GitHub에는 공개 시세 값과 날짜만 저장됩니다. 친구들도 그 값과 기록을 볼 수 있으므로 공개를 원하지 않는 값은 게시하지 마세요. 계정 ID, 비밀번호, 캐릭터명, 다른 계산 설정은 게시 데이터에 들어가지 않습니다. `config.local.json`과 `data/`가 Git에 추가돼 있으면 프로그램이 게시를 막습니다. 이전에 비밀번호를 채팅에 입력했다면 해당 비밀번호를 변경하세요.
 
 ## Windows에서 시작
 

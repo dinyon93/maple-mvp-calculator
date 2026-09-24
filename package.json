@@ -1,6 +1,6 @@
 {
   "name": "maple-mvp-calculator-local",
-  "version": "0.12.0",
+  "version": "0.13.0",
   "private": true,
   "description": "Local MapleStory calculator with daily price history and on-demand auction UI lookup",
   "scripts": { "start": "node server.js", "test": "node --test tests/*.test.js" },

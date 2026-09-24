@@ -80,6 +80,35 @@
     return changes.length;
   }
   window.MvpApp = { trendPrices, applyPrices };
+  async function loadPublicPrices() {
+    try {
+      const response = await fetch('./shared-prices.json', { cache: 'no-store' });
+      if (!response.ok) throw Error('공개 시세를 읽지 못했습니다.');
+      const data = await response.json();
+      if (!Array.isArray(data.history)) throw Error('공개 시세 형식이 올바르지 않습니다.');
+      const recent = {};
+      for (const row of data.history) {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(row?.date || '')) continue;
+        for (const [id, value] of Object.entries(row.values || {})) {
+          if (Number.isSafeInteger(value) && value > 0) recent[id] = { value, date: row.date };
+        }
+      }
+      const priced = [...model.items, ...model.creditItems];
+      for (const item of priced) {
+        if (!recent[item.id]) continue;
+        item.auctionPrice = recent[item.id].value;
+        item.updatedAt = recent[item.id].date;
+        item.priceSource = '온라인 공개 시세';
+      }
+      for (const id of ['marketRate', 'discordRate']) {
+        if (!recent[id]) continue;
+        model[id] = recent[id].value;
+        $(id).value = formatDigits(recent[id].value);
+      }
+      persist(); renderItems();
+      $('refreshStatus').textContent = data.updatedAt ? `공개 시세 마지막 기록: ${data.updatedAt} · 로컬 PC에서 갱신하면 배포 후 반영됩니다.` : '아직 게시된 시세가 없습니다. 로컬 PC에서 갱신해 주세요.';
+    } catch (error) { $('refreshStatus').textContent = `공개 시세 불러오기 실패: ${error.message}`; }
+  }
   function updateTotals() {
     const giftTotal = model.gifts.reduce((a, g) => a + 50000 * (Number(g.count) || 0), 0);
     const cardTotal = model.cards.reduce((a, c) => a + (Number(c.amount) || 0), 0);
@@ -164,6 +193,7 @@
     });
     $('refreshPrices').disabled = true;
     $('calculate').addEventListener('click', compute);
+    if (location.protocol !== 'file:') loadPublicPrices();
   }
   init();
 })();
