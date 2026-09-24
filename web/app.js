@@ -2,9 +2,9 @@
   'use strict';
   const KEY = 'maple-mvp-settings-v1';
   const giftTypes = [
-    { name: '도서문화상품권', cost: 47000, count: 12 },
-    { name: '넥슨카드', cost: 47500, count: 0 },
-    { name: '컬쳐랜드', cost: 47500, count: 0 }
+    { name: '도서문화상품권', cost: 47000, count: 4 },
+    { name: '넥슨카드', cost: 47500, count: 4 },
+    { name: '컬쳐랜드', cost: 47500, count: 2 }
   ];
   const itemDefaults = [
     { id: 'wonderberry', name: '위습의 원더베리' },
