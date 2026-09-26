@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-09-24",
+  "updatedAt": "2026-09-27",
   "history": [
     {
       "date": "2026-09-24",
@@ -12,6 +12,17 @@
         "primeadditionalcube": 1490000000,
         "marketRate": 2200,
         "discordRate": 1550
+      }
+    },
+    {
+      "date": "2026-09-27",
+      "values": {
+        "wonderberry": 213131313,
+        "royalstyle": 99000000,
+        "platinumscissors": 285000000,
+        "abysscirculator": 200000000,
+        "primecube": 580000000,
+        "primeadditionalcube": 1599999999
       }
     }
   ]
