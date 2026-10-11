@@ -44,6 +44,7 @@
     } catch (_) { return structuredClone(defaults); }
   }
   let model = readSaved();
+  let hasCalculated = false;
   function renderLists() {
     $('gifts').innerHTML = model.gifts.map((g, i) => `<div class="gift-row"><strong>${escapeHtml(g.name)}</strong><div class="unit-input">${amountField(`${g.name} 1장 구매가`, g.cost, `data-gift="${i}" data-key="cost"`)}<span>원</span></div><div class="unit-input">${numberField(`${g.name} 수량`, g.count, `data-gift="${i}" data-key="count"`)}<span>장</span></div></div>`).join('');
     $('cards').innerHTML = model.cards.map((c, i) => `<div class="card-row"><span class="row-index">${String(i + 1).padStart(2, '0')}</span><div class="unit-input">${amountField(`${i + 1}번 카드 결제금액`, c.amount, `data-card="${i}" data-key="amount"`)}<span>원</span></div><div class="unit-input">${amountField(`${i + 1}번 카드 혜택`, c.benefit, `data-card="${i}" data-key="benefit"`)}<span>원</span></div></div>`).join('');
@@ -63,51 +64,102 @@
     for (const item of [...model.items, ...model.creditItems]) if (item.id && item.auctionPrice) values[item.id] = item.auctionPrice;
     return values;
   }
-  function applyPrices(data, source) {
+  function applyPrices(data, source, record = true) {
     if (!Array.isArray(data.items) || data.items.length > 30) throw new Error('items 배열에 최대 30개 가격을 입력해 주세요.');
     const changes = [];
     for (const entry of data.items) {
       const row = [...model.items, ...model.creditItems].find(x => x.id === entry.id);
       const price = Number(entry.auctionPrice);
       if (!row || !Number.isSafeInteger(price) || price <= 0) throw new Error('시세의 아이템 ID 또는 개당 가격이 올바르지 않습니다.');
-      changes.push({ row, price });
+      changes.push({ row, price, observedAt: window.MvpPriceSync.iso(entry.observedAt) || new Date().toISOString() });
     }
-    for (const { row, price } of changes) {
-      row.auctionPrice = price; row.updatedAt = String(data.updatedAt || new Date().toLocaleString('ko-KR')).slice(0, 40); row.priceSource = source;
+    for (const { row, price, observedAt } of changes) {
+      row.auctionPrice = price; row.observedAt = record ? '' : observedAt; row.updatedAt = window.MvpPriceSync.displayTime(observedAt); row.priceSource = source;
+      if (record) markPriceEdited(row.id); else clearPricePending(row.id);
     }
     persist(); renderItems();
-    if (changes.length) window.MvpTrend?.record(Object.fromEntries(changes.map(({ row, price }) => [row.id, price])));
+    if (record && changes.length) window.MvpTrend?.record(Object.fromEntries(changes.map(({ row, price }) => [row.id, price])));
+    if (hasCalculated) compute();
     return changes.length;
   }
   window.MvpApp = { trendPrices, applyPrices };
-  async function loadPublicPrices() {
+  const localPricePage = false;
+  let priceLoadBusy = false, lastPriceSignature = '';
+  const dirtyPrices = new Set(Array.isArray(model.pendingPriceIds) ? model.pendingPriceIds : []);
+  function markPriceEdited(id) {
+    dirtyPrices.add(id); model.pendingPriceIds = [...dirtyPrices];
+  }
+  function clearPricePending(id) {
+    dirtyPrices.delete(id); model.pendingPriceIds = [...dirtyPrices];
+  }
+  async function loadLatestPrices({ force = false, report = true } = {}) {
+    if (priceLoadBusy || location.protocol === 'file:') return;
+    priceLoadBusy = true;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 10000);
     try {
-      const response = await fetch('./shared-prices.json', { cache: 'no-store' });
-      if (!response.ok) throw Error('공개 시세를 읽지 못했습니다.');
+      const url = localPricePage ? '/api/prices' : './shared-prices.json';
+      const response = await fetch(`${url}?t=${Date.now()}`, { cache: 'no-store', signal: controller.signal });
+      if (!response.ok) throw Error('저장된 시세를 읽지 못했습니다.');
       const data = await response.json();
-      if (!Array.isArray(data.history)) throw Error('공개 시세 형식이 올바르지 않습니다.');
-      const recent = {};
-      for (const row of data.history) {
-        if (!/^\d{4}-\d{2}-\d{2}$/.test(row?.date || '')) continue;
-        for (const [id, value] of Object.entries(row.values || {})) {
-          if (Number.isSafeInteger(value) && value > 0) recent[id] = { value, date: row.date };
+      if (!Array.isArray(data.history)) throw Error('시세 파일 형식이 올바르지 않습니다.');
+      const signature = JSON.stringify(data);
+      if (!force && signature === lastPriceSignature) return;
+      const recent = window.MvpPriceSync.latest(data.history);
+      let preserved = 0;
+      const source = localPricePage ? '로컬 저장 시세' : '온라인 공개 시세';
+      for (const item of [...model.items, ...model.creditItems]) {
+        const next = recent[item.id]; if (!next) continue;
+        if (!window.MvpPriceSync.shouldApply({ value: item.auctionPrice, observedAt: item.observedAt }, next,
+          { local: localPricePage, force, dirty: dirtyPrices.has(item.id) })) {
+          preserved++;
+          if (localPricePage && !next.observedAt && Number(item.auctionPrice) !== next.value) {
+            markPriceEdited(item.id); item.priceSource = '로컬 보관값 · 게시 확인 필요';
+          }
+          continue;
         }
+        item.auctionPrice = next.value; item.observedAt = next.observedAt;
+        item.updatedAt = window.MvpPriceSync.displayTime(next.observedAt || next.date);
+        item.priceSource = source; clearPricePending(item.id);
       }
-      const priced = [...model.items, ...model.creditItems];
-      for (const item of priced) {
-        if (!recent[item.id]) continue;
-        item.auctionPrice = recent[item.id].value;
-        item.updatedAt = recent[item.id].date;
-        item.priceSource = '온라인 공개 시세';
-      }
+      model.rateObservedAt ||= {};
       for (const id of ['marketRate', 'discordRate']) {
-        if (!recent[id]) continue;
-        model[id] = recent[id].value;
-        $(id).value = formatDigits(recent[id].value);
+        const next = recent[id]; if (!next) continue;
+        if (!window.MvpPriceSync.shouldApply({ value: model[id], observedAt: model.rateObservedAt[id] }, next,
+          { local: localPricePage, force, dirty: dirtyPrices.has(id) })) { preserved++; continue; }
+        model[id] = next.value; model.rateObservedAt[id] = next.observedAt;
+        $(id).value = formatDigits(next.value); clearPricePending(id);
       }
       persist(); renderItems();
-      $('refreshStatus').textContent = data.updatedAt ? `공개 시세 마지막 기록: ${data.updatedAt} · 로컬 PC에서 갱신하면 배포 후 반영됩니다.` : '아직 게시된 시세가 없습니다. 로컬 PC에서 갱신해 주세요.';
-    } catch (error) { $('refreshStatus').textContent = `공개 시세 불러오기 실패: ${error.message}`; }
+      if (hasCalculated) compute();
+      if (report) {
+        const time = window.MvpPriceSync.displayTime(data.updatedAt);
+        const published = data.publishedAt ? ` · 온라인 게시: ${window.MvpPriceSync.displayTime(data.publishedAt)}` : '';
+        $('refreshStatus').textContent = Object.keys(recent).length
+          ? `시세 갱신: ${time}${published}${preserved ? (localPricePage ? ' · 입력하거나 보관한 값은 유지했습니다. 로컬값을 공유하려면 현재 입력한 시세 온라인에 게시를 누르세요.' : ' · 직접 입력하거나 더 최근에 불러온 값은 유지했습니다. 게시값을 다시 적용하려면 최신 공개 시세 불러오기를 누르세요.') : ''}`
+          : '아직 저장된 시세가 없습니다. 로컬 PC에서 옥션 시세를 갱신해 주세요.';
+      }
+      lastPriceSignature = signature;
+      if (!$('trendPage').hidden) window.MvpTrend?.load();
+    } catch (error) {
+      if (report) $('refreshStatus').textContent = `최신 시세 확인 실패: ${error.name === 'AbortError' ? '응답 시간 초과' : error.message} 기존 입력값을 유지합니다.`;
+    } finally { clearTimeout(timer); priceLoadBusy = false; }
+  }
+  function startPriceSync() {
+    if (location.protocol === 'file:') return;
+    // A public page always starts with the published prices, not saved simulations.
+    if (!localPricePage) { dirtyPrices.clear(); model.pendingPriceIds = []; }
+    const button = localPricePage ? $('loadStoredPrices') : $('refreshPrices');
+    button.disabled = false;
+    button.addEventListener('click', () => loadLatestPrices({ force: true }));
+    const check = () => {
+      if (!document.hidden && !document.activeElement?.matches('input, select, textarea') && !$('refreshPrices').disabled)
+        loadLatestPrices();
+    };
+    document.addEventListener('visibilitychange', check);
+    window.addEventListener('focus', check);
+    setInterval(check, 60000);
+    loadLatestPrices();
   }
   function updateTotals() {
     const giftTotal = model.gifts.reduce((a, g) => a + 50000 * (Number(g.count) || 0), 0);
@@ -121,6 +173,7 @@
     $('targetStatus').classList.toggle('warning', difference !== 0);
   }
   function compute() {
+    hasCalculated = true;
     const output = window.MvpCalc.calculate(currentInput());
     if (output.error) { $('feedback').textContent = output.error; $('rankings').innerHTML = ''; $('creditSummary').innerHTML = ''; $('bestName').textContent = '입력값을 확인해 주세요'; $('bestLoss').textContent = '—'; $('bestSub').textContent = '계산 조건을 다시 확인해 주세요.'; return; }
     $('creditSummary').innerHTML = `<h3>기존 보유 크레딧 ${Number(output.existingCredits).toLocaleString('ko-KR')} · 구매 가능 수량</h3>${output.baseCreditOptions.map(cube => `<p>${escapeHtml(cube.name)} <strong>${cube.count.toLocaleString('ko-KR')}개</strong> · 판매 후 <strong>${cube.mesos === null ? '옥션가 입력 대기' : mesos(cube.mesos)}</strong> · 잔여 ${cube.remaining.toLocaleString('ko-KR')} 크레딧</p>`).join('')}`;
@@ -159,12 +212,12 @@
       else if (el.dataset.card !== undefined) model.cards[Number(el.dataset.card)][el.dataset.key] = storedValue;
       else if (el.dataset.item !== undefined) {
         const row = model.items[Number(el.dataset.item)]; row[el.dataset.key] = storedValue;
-        if (el.dataset.key === 'auctionPrice') { row.updatedAt = new Date().toLocaleString('ko-KR'); row.priceSource = '직접 입력'; el.closest('.item-row').querySelector('.item-updated').textContent = `직접 입력 · ${row.updatedAt}`; }
+        if (el.dataset.key === 'auctionPrice') { markPriceEdited(row.id); row.updatedAt = new Date().toLocaleString('ko-KR'); row.priceSource = '직접 입력'; el.closest('.item-row').querySelector('.item-updated').textContent = `직접 입력 · ${row.updatedAt}`; }
       } else if (el.dataset.credit !== undefined) {
-        const row = model.creditItems[Number(el.dataset.credit)]; row[el.dataset.key] = storedValue; row.updatedAt = new Date().toLocaleString('ko-KR'); row.priceSource = '직접 입력'; el.closest('.item-row').querySelector('.item-updated').textContent = `직접 입력 · ${row.updatedAt}`;
+        const row = model.creditItems[Number(el.dataset.credit)]; row[el.dataset.key] = storedValue; markPriceEdited(row.id); row.updatedAt = new Date().toLocaleString('ko-KR'); row.priceSource = '직접 입력'; el.closest('.item-row').querySelector('.item-updated').textContent = `직접 입력 · ${row.updatedAt}`;
       } else if (el.id === 'targetCash') model.target = storedValue;
-      else if (el.id === 'discordRate') model.discordRate = storedValue;
-      else if (el.id === 'marketRate') model.marketRate = storedValue;
+      else if (el.id === 'discordRate') { model.discordRate = storedValue; markPriceEdited('discordRate'); }
+      else if (el.id === 'marketRate') { model.marketRate = storedValue; markPriceEdited('marketRate'); }
       else if (el.id === 'eventPoints') model.event.points = storedValue;
       else if (el.id === 'eventCost') model.event.cost = storedValue;
       else if (el.id === 'eventCount') model.event.count = el.value;
@@ -191,9 +244,9 @@
       } catch (error) { $('feedback').textContent = `시세 파일을 반영하지 못했습니다: ${error.message}`; }
       event.target.value = '';
     });
-    $('refreshPrices').disabled = true;
+    $('refreshPrices').disabled = false;
     $('calculate').addEventListener('click', compute);
-    if (location.protocol !== 'file:') loadPublicPrices();
+    startPriceSync();
   }
   init();
 })();

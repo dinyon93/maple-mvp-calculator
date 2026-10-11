@@ -21,7 +21,7 @@
     $('trendStorageNote').textContent = '직접 입력한 값은 이 브라우저에 저장됩니다.';
     if (location.protocol !== 'file:') {
       try {
-        const response = await fetch('./shared-prices.json', { cache: 'no-store' });
+        const response = await fetch(`./shared-prices.json?t=${Date.now()}`, { cache: 'no-store' });
         if (!response.ok) throw Error('공개 기록을 읽지 못했습니다.');
         const data = await response.json();
         if (!Array.isArray(data.history)) throw Error('공개 기록 형식이 올바르지 않습니다.');

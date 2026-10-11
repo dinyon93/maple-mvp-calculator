@@ -3,7 +3,8 @@ const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
 const { refreshAuctionPrices } = require('./auction');
-const { publish } = require('./publish');
+const { publish, buildSnapshot } = require('./publish');
+const PriceSync = require('./web/price-sync');
 const PORT = 8765, ROOT = __dirname, DATA = process.env.MVP_DATA_PATH || path.join(ROOT, 'data', 'trends.json');
 const LOGIN_CONFIG = path.join(ROOT, 'config.local.json');
 const SELECTOR_KEYS = ['loginEntrySelector', 'loginMethodSelector', 'loginIdSelector', 'loginPasswordSelector',
@@ -11,9 +12,10 @@ const SELECTOR_KEYS = ['loginEntrySelector', 'loginMethodSelector', 'loginIdSele
 const SERIES = new Set(['wonderberry', 'royalstyle', 'platinumscissors', 'abysscirculator', 'primecube', 'primeadditionalcube', 'marketRate', 'discordRate']);
 const FILES = new Map([['/', 'index.html'], ['/index.html', 'index.html'], ['/style.css', 'style.css'], ['/calc.js', 'calc.js'], ['/app.js', 'app.js'], ['/trend.js', 'trend.js'], ['/auction-prices.example.json', 'auction-prices.example.json']]);
 const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'application/javascript; charset=utf-8', '.json': 'application/json; charset=utf-8' };
+FILES.set('/price-sync.js', 'web/price-sync.js');
 function localDate() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
 function readHistory() { try { const x = JSON.parse(fs.readFileSync(DATA, 'utf8')); return Array.isArray(x) ? x : []; } catch (error) { if (error.code === 'ENOENT') return []; throw error; } }
-function saveHistory(values) {
+function saveHistory(values, observedAt = {}) {
   const clean = {};
   if (!values || typeof values !== 'object' || Array.isArray(values)) throw Error('시세 형식이 올바르지 않습니다.');
   for (const [key, value] of Object.entries(values)) {
@@ -22,8 +24,17 @@ function saveHistory(values) {
   }
   if (!Object.keys(clean).length) return readHistory();
   const history = readHistory(), today = localDate();
-  const row = history.find(x => x.date === today);
-  if (row) Object.assign(row.values, clean); else history.push({ date: today, values: clean });
+  let row = history.find(x => x.date === today);
+  if (!row) { row = { date: today, values: {} }; history.push(row); }
+  row.observedAt ||= {};
+  const now = new Date().toISOString();
+  for (const [id, value] of Object.entries(clean)) {
+    const timestamp = PriceSync.iso(observedAt[id]) || now;
+    // An earlier request finishing late must not replace a newer observation.
+    if (PriceSync.iso(row.observedAt[id]) > timestamp) continue;
+    row.values[id] = value;
+    row.observedAt[id] = timestamp;
+  }
   history.sort((a, b) => a.date.localeCompare(b.date));
   fs.mkdirSync(path.dirname(DATA), { recursive: true });
   const temp = `${DATA}.${process.pid}.tmp`;
@@ -72,6 +83,7 @@ function createServer(refresh = refreshAuctionPrices, loginConfig = readLocalLog
     const pathname = new URL(req.url, origin).pathname;
     if (req.method === 'GET' && pathname === '/api/health') return send(res, 200, { local: true });
     if (req.method === 'GET' && pathname === '/api/trends') return send(res, 200, readHistory());
+    if (req.method === 'GET' && pathname === '/api/prices') return send(res, 200, buildSnapshot(readHistory()));
     if (req.method === 'POST' && (pathname === '/api/trends' || pathname === '/api/refresh' || pathname === '/api/publish')) {
       if (req.headers.origin !== origin) return send(res, 403, { error: '로컬 페이지에서만 요청할 수 있습니다.' });
       try {
@@ -94,7 +106,7 @@ function createServer(refresh = refreshAuctionPrices, loginConfig = readLocalLog
           for (const id of ['marketRate', 'discordRate']) {
             if (body.values?.[id] !== '' && body.values?.[id] != null) values[id] = body.values[id];
           }
-          if (Object.keys(values).length) saveHistory(values);
+          if (Object.keys(values).length) saveHistory(values, Object.fromEntries((result.items || []).map(item => [item.id, item.observedAt])));
           try { result.publication = publisher(readHistory()); }
           catch (error) { result.publication = { published: false, error: error.message }; }
           return send(res, 200, result);

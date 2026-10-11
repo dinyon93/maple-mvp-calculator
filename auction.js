@@ -279,7 +279,11 @@ async function refreshAuctionPrices({ id, password, character, auctionAccount = 
           if (value) break;
           await auctionPage.waitForTimeout(400);
         }
-        if (value) items.push({ id: item.id, auctionPrice: value });
+        if (value) {
+          const observedAt = new Date().toISOString();
+          items.push({ id: item.id, auctionPrice: value, observedAt });
+          console.log(`[옥션 시세] ${item.name}: ${value.toLocaleString('ko-KR')} 메소 · ${observedAt}`);
+        }
         else errors.push(`${item.name}: 개당 가격을 읽지 못함`);
       } catch (_) { errors.push(`${item.name}: 검색 화면을 읽지 못함`); }
     }
