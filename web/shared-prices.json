@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-25T02:06:38.207Z",
+  "updatedAt": "2026-10-25T08:41:47.018Z",
   "history": [
     {
       "date": "2026-09-24",
@@ -333,22 +333,22 @@
     {
       "date": "2026-10-25",
       "values": {
-        "wonderberry": 264021164,
-        "royalstyle": 114444444,
-        "platinumscissors": 299999999,
-        "abysscirculator": 240000000,
-        "primecube": 699999999,
+        "wonderberry": 257272727,
+        "royalstyle": 111238889,
+        "platinumscissors": 311999999,
+        "abysscirculator": 239999999,
+        "primecube": 612888888,
         "primeadditionalcube": 1200000000
       },
       "observedAt": {
-        "wonderberry": "2026-10-25T02:06:10.258Z",
-        "royalstyle": "2026-10-25T02:06:15.812Z",
-        "platinumscissors": "2026-10-25T02:06:21.415Z",
-        "abysscirculator": "2026-10-25T02:06:27.004Z",
-        "primecube": "2026-10-25T02:06:32.580Z",
-        "primeadditionalcube": "2026-10-25T02:06:38.207Z"
+        "wonderberry": "2026-10-25T08:41:19.076Z",
+        "royalstyle": "2026-10-25T08:41:24.708Z",
+        "platinumscissors": "2026-10-25T08:41:30.285Z",
+        "abysscirculator": "2026-10-25T08:41:35.863Z",
+        "primecube": "2026-10-25T08:41:41.441Z",
+        "primeadditionalcube": "2026-10-25T08:41:47.018Z"
       }
     }
   ],
-  "publishedAt": "2026-10-25T02:06:39.636Z"
+  "publishedAt": "2026-10-25T08:41:48.031Z"
 }
